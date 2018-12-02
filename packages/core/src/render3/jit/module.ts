@@ -7,16 +7,18 @@
  */
 
 import {resolveForwardRef} from '../../di/forward_ref';
+import {Component} from '../../metadata/directives';
 import {ModuleWithProviders, NgModule, NgModuleDef, NgModuleTransitiveScopes} from '../../metadata/ng_module';
 import {Type} from '../../type';
 import {assertDefined} from '../assert';
 import {getComponentDef, getDirectiveDef, getNgModuleDef, getPipeDef} from '../definition';
 import {NG_COMPONENT_DEF, NG_DIRECTIVE_DEF, NG_INJECTOR_DEF, NG_MODULE_DEF, NG_PIPE_DEF} from '../fields';
 import {ComponentDef} from '../interfaces/definition';
+import {stringify} from '../util';
 
 import {R3InjectorMetadataFacade, getCompilerFacade} from './compiler_facade';
 import {angularCoreEnv} from './environment';
-import {reflectDependencies} from './util';
+import {getReflect, reflectDependencies} from './util';
 
 const EMPTY_ARRAY: Type<any>[] = [];
 
@@ -149,8 +151,7 @@ function setScopeOnDeclaredComponents(moduleType: Type<any>, ngModule: NgModule)
     if (declaration.hasOwnProperty(NG_COMPONENT_DEF)) {
       // An `ngComponentDef` field exists - go ahead and patch the component directly.
       const component = declaration as Type<any>& {ngComponentDef: ComponentDef<any>};
-      const componentDef = getComponentDef(component) !;
-      patchComponentDefWithScope(componentDef, transitiveScopes);
+      patchComponentDefWithScope(component, transitiveScopes);
     } else if (
         !declaration.hasOwnProperty(NG_DIRECTIVE_DEF) && !declaration.hasOwnProperty(NG_PIPE_DEF)) {
       // Set `ngSelectorScope` for future reference when the component compilation finishes.
@@ -164,12 +165,24 @@ function setScopeOnDeclaredComponents(moduleType: Type<any>, ngModule: NgModule)
  * a given module.
  */
 export function patchComponentDefWithScope<C>(
-    componentDef: ComponentDef<C>, transitiveScopes: NgModuleTransitiveScopes) {
-  componentDef.directiveDefs = () => Array.from(transitiveScopes.compilation.directives)
-                                         .map(dir => getDirectiveDef(dir) || getComponentDef(dir) !)
-                                         .filter(def => !!def);
-  componentDef.pipeDefs = () =>
-      Array.from(transitiveScopes.compilation.pipes).map(pipe => getPipeDef(pipe) !);
+    component: Type<any>, transitiveScopes: NgModuleTransitiveScopes) {
+  const componentDef = getComponentDef(component) !;
+  const meta =
+      getReflect().annotations(component).filter(m => m instanceof Component).pop() as Component |
+      null;
+  if (!meta) {
+    throw new Error(`${stringify(component)} has no component metadata`);
+  }
+  const directives =
+      (meta.directives || []).concat(Array.from(transitiveScopes.compilation.directives));
+  if (directives.length) {
+    componentDef.directiveDefs = () =>
+        directives.map(dir => getDirectiveDef(dir) || getComponentDef(dir) !).filter(def => !!def);
+  }
+  const pipes = (meta.pipes || []).concat(Array.from(transitiveScopes.compilation.pipes));
+  if (pipes.length) {
+    componentDef.pipeDefs = () => pipes.map(pipe => getPipeDef(pipe) !);
+  }
 }
 
 /**

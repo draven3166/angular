@@ -81,7 +81,18 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
         // finishes compiling.
         if (hasSelectorScope(type)) {
           const scopes = transitiveScopesFor(type.ngSelectorScope);
-          patchComponentDefWithScope(ngComponentDef, scopes);
+          patchComponentDefWithScope(type, scopes);
+        } else {
+          patchComponentDefWithScope(type, {
+            compilation: {
+              directives: new Set<any>(),
+              pipes: new Set<any>(),
+            },
+            exported: {
+              directives: new Set<any>(),
+              pipes: new Set<any>(),
+            },
+          });
         }
       }
       return ngComponentDef;
