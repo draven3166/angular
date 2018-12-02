@@ -502,8 +502,7 @@ function compileNgModule(moduleType: Type<any>, resolvers: Resolvers): void {
 
   // Compile transitive modules, components, directives and pipes
   const transitiveScope = transitiveScopesFor(moduleType, resolvers);
-  compiledComponents.forEach(
-      cmp => patchComponentDefWithScope((cmp as any).ngComponentDef, transitiveScope));
+  compiledComponents.forEach(cmp => patchComponentDefWithScope(cmp, transitiveScope));
 }
 
 /**
